@@ -44,7 +44,9 @@ export default function Auth() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <div style={styles.brandMark}>W</div>
+        <div style={styles.brandMark}>
+          <img src="/westminster-logo.png" alt="University of Westminster" style={styles.brandLogo} />
+        </div>
         <h1 style={styles.title}>University of Westminster Marketplace</h1>
         <p style={styles.subtitle}>Exclusively for University of Westminster students &amp; staff</p>
 
@@ -129,19 +131,22 @@ const styles = {
     boxShadow: '0 30px 80px rgba(0,0,0,0.4)',
   },
   brandMark: {
-    width: '40px',
-    height: '40px',
+    width: '110px',
+    height: '110px',
     borderRadius: '50%',
     backgroundColor: '#1a0844',
-    color: '#c9a84c',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontFamily: "'Cormorant Garamond', Georgia, serif",
-    fontSize: '1.3rem',
-    fontWeight: 700,
-    margin: '0 auto 1rem',
-    letterSpacing: '0.02em',
+    margin: '0 auto 1.5rem',
+    padding: '18px',
+    boxSizing: 'border-box',
+  },
+  brandLogo: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+    filter: 'brightness(0) invert(1)',
   },
   title: {
     textAlign: 'center',

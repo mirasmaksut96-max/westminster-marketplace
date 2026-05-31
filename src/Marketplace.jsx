@@ -512,8 +512,8 @@ export default function Marketplace({ session }) {
 }
 
 const styles = {
-  page: { minHeight: '100vh', backgroundColor: '#f9f2f4', paddingBottom: '5rem', fontFamily: "'Inter', system-ui, sans-serif" },
-  header: { backgroundColor: '#3d0c1e', padding: '0.9rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' },
+  page: { minHeight: '100vh', backgroundColor: '#1a0844', backgroundImage: 'radial-gradient(ellipse at 25% 60%, #3d1b8a 0%, transparent 55%)', paddingBottom: '5rem', fontFamily: "'Inter', system-ui, sans-serif" },
+  header: { backgroundColor: 'rgba(255,255,255,0.04)', borderBottom: '1px solid rgba(255,255,255,0.08)', padding: '0.9rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' },
   logoWrapper: { display: 'flex', alignItems: 'center', gap: '0.85rem' },
   uniLogo: { height: '36px', width: 'auto', display: 'block', flexShrink: 0, filter: 'brightness(0) invert(1)' },
   logoDivider: { color: 'rgba(255,255,255,0.25)', fontSize: '1.4rem', fontWeight: 100, lineHeight: 1, userSelect: 'none', paddingBottom: '2px' },
@@ -524,7 +524,7 @@ const styles = {
   messagesBtn: { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '3px', padding: '0.3rem 0.85rem', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.05em' },
   unreadBadge: { position: 'absolute', top: '-6px', right: '-6px', backgroundColor: '#c9a84c', color: '#3d0c1e', borderRadius: '10px', padding: '1px 5px', fontSize: '0.65rem', fontWeight: 700, minWidth: '16px', textAlign: 'center', pointerEvents: 'none' },
   logoutBtn: { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.45)', border: 'none', borderRadius: '3px', padding: '0.3rem 0.75rem', cursor: 'pointer', fontSize: '0.75rem', letterSpacing: '0.04em' },
-  hero: { backgroundColor: '#3d0c1e', padding: '2rem 2rem 3rem', textAlign: 'center' },
+  hero: { backgroundColor: 'transparent', padding: '2rem 2rem 3rem', textAlign: 'center' },
   heroText: { color: 'rgba(255,255,255,0.88)', margin: '0 0 1.5rem', fontSize: '1.6rem', fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 400, letterSpacing: '0.02em' },
   searchRow: { display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' },
   search: { flex: 1, maxWidth: '480px', padding: '0.8rem 1.25rem', borderRadius: '3px', border: 'none', fontSize: '0.9rem', boxSizing: 'border-box', outline: 'none', backgroundColor: 'rgba(255,255,255,0.96)', color: '#1a0810' },
@@ -543,7 +543,7 @@ const styles = {
   resultsBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 2rem', backgroundColor: '#f9f2f4', borderBottom: '1px solid #f0e3e8' },
   resultsText: { fontSize: '0.75rem', color: '#9b7a82', letterSpacing: '0.05em' },
   clearFiltersLink: { fontSize: '0.75rem', color: '#8b2244', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', letterSpacing: '0.03em' },
-  content: { padding: '1.75rem 2rem' },
+  content: { padding: '1.75rem 2rem', backgroundColor: '#f9f2f4', minHeight: '60vh' },
   empty: { textAlign: 'center', color: '#9b7a82', marginTop: '3rem', letterSpacing: '0.03em' },
   emptyBox: { textAlign: 'center', marginTop: '4rem' },
   emptyTitle: { fontSize: '1.4rem', fontWeight: 500, color: '#4a1e2a', fontFamily: "'Cormorant Garamond', Georgia, serif", marginBottom: '0.5rem' },
