@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@700;800;900&family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -11,8 +13,11 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: 'Cormorant Garamond', Georgia, serif;
+  --brand: #3d0c1e;
+  --brand-mid: #8b2244;
+  --brand-light: #f9f2f4;
   --mono: ui-monospace, Consolas, monospace;
 
   font: 18px/145% var(--sans);
@@ -55,11 +60,10 @@ body {
 }
 
 #root {
-  width: 1126px;
+  width: 100%;
   max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  margin: 0;
+  text-align: left;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -108,4 +112,35 @@ code {
   line-height: 135%;
   padding: 4px 8px;
   background: var(--code-bg);
+}
+
+/* ── Mobile overrides ── */
+@media (max-width: 640px) {
+  /* Hide email in header to save space */
+  .mp-header-right .mp-email { display: none !important; }
+
+  /* Listing grid: 2 columns on phone */
+  .mp-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Reduce page padding */
+  .mp-content { padding: 0.75rem !important; }
+  .mp-hero    { padding: 1rem 1rem 2rem !important; }
+
+  /* ListingDetail modal: full screen */
+  .ld-modal {
+    border-radius: 0 !important;
+    max-height: 100dvh !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 400px) {
+  /* Single column on very small screens */
+  .mp-grid {
+    grid-template-columns: 1fr !important;
+  }
 }

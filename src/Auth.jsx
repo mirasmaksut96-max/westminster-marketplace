@@ -13,6 +13,10 @@ export default function Auth() {
 
 
   const handleRegister = async () => {
+    if (!email.toLowerCase().endsWith('@westminster.ac.uk')) {
+      setMessage('Only @westminster.ac.uk email addresses can register.')
+      return
+    }
     setLoading(true)
     setMessage('')
     const { error } = await supabase.auth.signUp({
@@ -23,7 +27,7 @@ export default function Auth() {
       }
     })
     if (error) setMessage(error.message)
-    else setMessage('Check your Westminster email to confirm your account!')
+    else setMessage('Check your University of Westminster email to confirm your account!')
     setLoading(false)
   }
 
@@ -40,21 +44,20 @@ export default function Auth() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>🎓 Westminster Marketplace</h1>
-        <p style={styles.subtitle}>Buy and sell with fellow Westminster students & staff</p>
-
+        <div style={styles.brandMark}>W</div>
+        <h1 style={styles.title}>University of Westminster Marketplace</h1>
+        <p style={styles.subtitle}>Exclusively for University of Westminster students &amp; staff</p>
 
         <div style={styles.tabs}>
           <button
             style={isLogin ? styles.activeTab : styles.tab}
             onClick={() => setIsLogin(true)}
-          >Login</button>
+          >Sign In</button>
           <button
             style={!isLogin ? styles.activeTab : styles.tab}
             onClick={() => setIsLogin(false)}
           >Register</button>
         </div>
-
 
         {!isLogin && (
           <input
@@ -65,14 +68,12 @@ export default function Auth() {
           />
         )}
 
-
         <input
           style={styles.input}
-          placeholder="Westminster email (@westminster.ac.uk)"
+          placeholder="UoW email (@westminster.ac.uk)"
           value={email}
           onChange={e => setEmail(e.target.value)}
         />
-
 
         <input
           style={styles.input}
@@ -81,7 +82,6 @@ export default function Auth() {
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
-
 
         {!isLogin && (
           <select
@@ -94,16 +94,14 @@ export default function Auth() {
           </select>
         )}
 
-
         {message && <p style={styles.message}>{message}</p>}
-
 
         <button
           style={styles.button}
           onClick={isLogin ? handleLogin : handleRegister}
           disabled={loading}
         >
-          {loading ? 'Please wait...' : isLogin ? 'Login' : 'Create Account'}
+          {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
         </button>
       </div>
     </div>
@@ -117,82 +115,117 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#1a0844',
+    backgroundImage: 'radial-gradient(ellipse at 25% 60%, #3d1b8a 0%, transparent 55%)',
+    padding: '1rem',
+    fontFamily: "'Inter', system-ui, sans-serif",
   },
   card: {
     backgroundColor: 'white',
-    padding: '2rem',
-    borderRadius: '12px',
+    padding: '2.75rem 2.5rem',
+    borderRadius: '6px',
     width: '100%',
     maxWidth: '420px',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+    boxShadow: '0 30px 80px rgba(0,0,0,0.4)',
+  },
+  brandMark: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    backgroundColor: '#1a0844',
+    color: '#c9a84c',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: "'Cormorant Garamond', Georgia, serif",
+    fontSize: '1.3rem',
+    fontWeight: 700,
+    margin: '0 auto 1rem',
+    letterSpacing: '0.02em',
   },
   title: {
     textAlign: 'center',
-    color: '#4a1fb8',
-    marginBottom: '0.25rem',
-    fontSize: '1.5rem',
+    color: '#120826',
+    marginBottom: '0.3rem',
+    fontSize: '1.75rem',
+    fontFamily: "'Cormorant Garamond', Georgia, serif",
+    fontWeight: 600,
+    letterSpacing: '0.02em',
+    margin: '0 0 0.3rem',
   },
   subtitle: {
     textAlign: 'center',
-    color: '#6b7280',
-    fontSize: '0.9rem',
-    marginBottom: '1.5rem',
+    color: '#8b7d9a',
+    fontSize: '0.8rem',
+    marginBottom: '2rem',
+    letterSpacing: '0.05em',
+    margin: '0 0 2rem',
   },
   tabs: {
     display: 'flex',
-    marginBottom: '1.25rem',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    border: '1px solid #e5e7eb',
+    marginBottom: '1.75rem',
+    borderBottom: '1px solid #e4dded',
   },
   tab: {
     flex: 1,
-    padding: '0.6rem',
+    padding: '0.65rem',
     border: 'none',
-    background: 'white',
+    borderBottom: '2px solid transparent',
+    background: 'transparent',
     cursor: 'pointer',
-    fontSize: '0.95rem',
-    color: '#6b7280',
+    fontSize: '0.8rem',
+    color: '#8b7d9a',
+    letterSpacing: '0.07em',
+    textTransform: 'uppercase',
+    fontWeight: 400,
+    marginBottom: '-1px',
   },
   activeTab: {
     flex: 1,
-    padding: '0.6rem',
+    padding: '0.65rem',
     border: 'none',
-    background: '#4a1fb8',
+    borderBottom: '2px solid #1a0844',
+    background: 'transparent',
     cursor: 'pointer',
-    fontSize: '0.95rem',
-    color: 'white',
-    fontWeight: 'bold',
+    fontSize: '0.8rem',
+    color: '#1a0844',
+    fontWeight: 600,
+    letterSpacing: '0.07em',
+    textTransform: 'uppercase',
+    marginBottom: '-1px',
   },
   input: {
     width: '100%',
-    padding: '0.75rem',
+    padding: '0.75rem 0.85rem',
     marginBottom: '1rem',
-    borderRadius: '8px',
-    border: '1px solid #e5e7eb',
-    fontSize: '0.95rem',
+    borderRadius: '4px',
+    border: '1px solid #e4dded',
+    fontSize: '0.9rem',
     boxSizing: 'border-box',
+    outline: 'none',
+    color: '#120826',
+    backgroundColor: '#fdfcfb',
+    fontFamily: "'Inter', system-ui, sans-serif",
   },
   button: {
     width: '100%',
-    padding: '0.75rem',
-    backgroundColor: '#4a1fb8',
+    padding: '0.85rem',
+    backgroundColor: '#1a0844',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '1rem',
+    borderRadius: '4px',
+    fontSize: '0.8rem',
     cursor: 'pointer',
-    fontWeight: 'bold',
+    fontWeight: 500,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    fontFamily: "'Inter', system-ui, sans-serif",
   },
   message: {
     textAlign: 'center',
-    color: '#4a1fb8',
+    color: '#3d1b8a',
     marginBottom: '1rem',
-    fontSize: '0.9rem',
-  }
+    fontSize: '0.85rem',
+    lineHeight: '1.5',
+  },
 }
-
-
-
-

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 44" width="380" height="44">
+  <!-- University of Westminster shield/crest icon (simplified) -->
+  <rect x="0" y="4" width="36" height="36" rx="2" fill="none" stroke="#ffffff" stroke-width="1.5"/>
+  <rect x="4" y="8" width="12" height="12" rx="1" fill="#ffffff" opacity="0.9"/>
+  <rect x="20" y="8" width="12" height="12" rx="1" fill="#ffffff" opacity="0.9"/>
+  <rect x="4" y="24" width="12" height="12" rx="1" fill="#ffffff" opacity="0.9"/>
+  <rect x="20" y="24" width="12" height="12" rx="1" fill="#ffffff" opacity="0.9"/>
+  <!-- University name -->
+  <text x="46" y="16" font-family="'Cormorant Garamond', Georgia, serif" font-size="11" font-weight="600" fill="#ffffff" letter-spacing="2">UNIVERSITY OF WESTMINSTER</text>
+  <line x1="46" y1="22" x2="378" y2="22" stroke="#ffffff" stroke-width="0.5" opacity="0.4"/>
+  <text x="46" y="34" font-family="'Inter', system-ui, sans-serif" font-size="8.5" font-weight="400" fill="rgba(255,255,255,0.6)" letter-spacing="1.5">LONDON · FOUNDED 1838</text>
+</svg>
