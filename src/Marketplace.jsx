@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import PostListing from './PostListing'
 import ListingDetail from './ListingDetail'
 import Messages from './Messages'
 import Profile from './Profile'
 import SellerProfile from './SellerProfile'
+import ContactAdmin, { ADMIN_ID } from './ContactAdmin'
+import AdminDashboard from './AdminDashboard'
 
 const CATEGORIES = [
   { label: 'All', value: 'all' },
@@ -17,6 +19,17 @@ const CATEGORIES = [
   { label: 'Kitchen & Home', value: 'kitchen' },
   { label: 'Other', value: 'other' },
 ]
+
+const PAGE_SIZE = 24
+
+function useDebouncedValue(value, delayMs) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(id)
+  }, [value, delayMs])
+  return debounced
+}
 
 export default function Marketplace({ session }) {
   const [showPost, setShowPost] = useState(false)
@@ -34,17 +47,37 @@ export default function Marketplace({ session }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [viewMode, setViewMode] = useState('active')
   const [selectedSeller, setSelectedSeller] = useState(null)
+  const [showContactAdmin, setShowContactAdmin] = useState(false)
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false)
+  const [pendingReportCount, setPendingReportCount] = useState(0)
   const [sortBy, setSortBy] = useState('newest')
   const [conditionFilter, setConditionFilter] = useState('all')
   const [postedWithin, setPostedWithin] = useState('any')
   const [hasPhotosOnly, setHasPhotosOnly] = useState(false)
   const [savedOnly, setSavedOnly] = useState(false)
   const [locationFilter, setLocationFilter] = useState('')
+  const [totalCount, setTotalCount] = useState(0)
+  const [page, setPage] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const requestIdRef = useRef(0)
+
+  const debouncedSearch = useDebouncedValue(search, 350)
+  const debouncedMinPrice = useDebouncedValue(minPrice, 350)
+  const debouncedMaxPrice = useDebouncedValue(maxPrice, 350)
+  const debouncedLocationFilter = useDebouncedValue(locationFilter, 350)
 
   useEffect(() => {
-    fetchListings()
     fetchSavedItems()
-  }, [category, viewMode])
+  }, [])
+
+  useEffect(() => {
+    fetchListings(0, true)
+  }, [category, viewMode, debouncedSearch, debouncedMinPrice, debouncedMaxPrice,
+      conditionFilter, postedWithin, hasPhotosOnly, savedOnly, debouncedLocationFilter, sortBy])
+
+  useEffect(() => {
+    if (session.user.id === ADMIN_ID) fetchPendingReportCount()
+  }, [])
 
   useEffect(() => {
     fetchUnreadCount()
@@ -52,15 +85,31 @@ export default function Marketplace({ session }) {
     return () => clearInterval(interval)
   }, [])
 
-  const fetchListings = async () => {
-    setLoading(true)
+  const fetchListings = async (pageNum = 0, replace = true, savedItemsOverride = null) => {
+    if (replace) setLoading(true)
+    else setLoadingMore(true)
+    const reqId = ++requestIdRef.current
+    const effectiveSavedItems = savedItemsOverride ?? savedItems
+
+    if (savedOnly && effectiveSavedItems.length === 0) {
+      if (reqId === requestIdRef.current) {
+        setListings([])
+        setTotalCount(0)
+        setPage(0)
+      }
+      setLoading(false)
+      setLoadingMore(false)
+      return
+    }
+
     const categoryJoin = category !== 'all'
       ? 'categories!inner(name, slug)'
       : 'categories(name, slug)'
     let query = supabase
       .from('listings')
-      .select(`*, profiles(full_name, role), ${categoryJoin}`)
-      .order('created_at', { ascending: false })
+      .select(`*, profiles(full_name, role), ${categoryJoin}`, { count: 'exact' })
+      .order(sortBy === 'price_asc' || sortBy === 'price_desc' ? 'price' : 'created_at',
+        { ascending: sortBy === 'oldest' || sortBy === 'price_asc' })
 
     if (viewMode === 'sold') {
       query = query
@@ -81,10 +130,30 @@ export default function Marketplace({ session }) {
     if (category !== 'all') {
       query = query.eq('categories.slug', category)
     }
+    if (debouncedSearch) query = query.ilike('title', `%${debouncedSearch}%`)
+    if (debouncedMinPrice !== '') query = query.gte('price', parseFloat(debouncedMinPrice))
+    if (debouncedMaxPrice !== '') query = query.lte('price', parseFloat(debouncedMaxPrice))
+    if (conditionFilter !== 'all') query = query.eq('condition', conditionFilter)
+    if (hasPhotosOnly) query = query.gt('image_urls', '{}')
+    if (debouncedLocationFilter) query = query.ilike('pickup_location', `%${debouncedLocationFilter}%`)
+    if (postedWithin !== 'any') {
+      const ms = postedWithin === 'today' ? 86400000 : postedWithin === 'week' ? 604800000 : 2592000000
+      query = query.gte('created_at', new Date(Date.now() - ms).toISOString())
+    }
+    if (savedOnly) query = query.in('id', effectiveSavedItems)
 
-    const { data, error } = await query
-    if (!error) setListings(data || [])
+    query = query.range(pageNum * PAGE_SIZE, pageNum * PAGE_SIZE + PAGE_SIZE - 1)
+
+    const { data, error, count } = await query
+    if (reqId !== requestIdRef.current) return
+
+    if (!error) {
+      setListings(prev => replace ? (data || []) : [...prev, ...(data || [])])
+      setTotalCount(count ?? 0)
+      setPage(pageNum)
+    }
     setLoading(false)
+    setLoadingMore(false)
   }
 
   const fetchUnreadCount = async () => {
@@ -94,6 +163,23 @@ export default function Marketplace({ session }) {
       .eq('receiver_id', session.user.id)
       .eq('is_read', false)
     setUnreadCount(count || 0)
+  }
+
+  const fetchPendingReportCount = async () => {
+    const { count } = await supabase
+      .from('reports')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending')
+    setPendingReportCount(count || 0)
+  }
+
+  const openListingById = async (listingId) => {
+    const { data } = await supabase
+      .from('listings')
+      .select('*, profiles(full_name, role), categories(name, slug)')
+      .eq('id', listingId)
+      .maybeSingle()
+    if (data) setSelectedListing(data)
   }
 
   const fetchSavedItems = async () => {
@@ -110,6 +196,7 @@ export default function Marketplace({ session }) {
   const toggleSave = async (e, listingId) => {
     e.stopPropagation()
     const isSaved = savedItems.includes(listingId)
+    const next = isSaved ? savedItems.filter(id => id !== listingId) : [...savedItems, listingId]
 
     if (isSaved) {
       await supabase
@@ -117,37 +204,14 @@ export default function Marketplace({ session }) {
         .delete()
         .eq('user_id', session.user.id)
         .eq('listing_id', listingId)
-      setSavedItems(savedItems.filter(id => id !== listingId))
     } else {
       await supabase
         .from('saved_items')
         .insert({ user_id: session.user.id, listing_id: listingId })
-      setSavedItems([...savedItems, listingId])
     }
+    setSavedItems(next)
+    if (savedOnly) fetchListings(0, true, next)
   }
-
-  const filtered = listings
-    .filter(l => {
-      const matchesSearch = l.title?.toLowerCase().includes(search.toLowerCase())
-      const matchesMin = minPrice === '' || parseFloat(l.price) >= parseFloat(minPrice)
-      const matchesMax = maxPrice === '' || parseFloat(l.price) <= parseFloat(maxPrice)
-      const matchesCondition = conditionFilter === 'all' || l.listing_type === 'wanted' || l.condition === conditionFilter
-      const matchesPhotos = !hasPhotosOnly || (l.image_urls?.length > 0)
-      const matchesSaved = !savedOnly || savedItems.includes(l.id)
-      const matchesLocation = locationFilter === '' || l.pickup_location?.toLowerCase().includes(locationFilter.toLowerCase())
-      let matchesPosted = true
-      if (postedWithin !== 'any') {
-        const ms = postedWithin === 'today' ? 86400000 : postedWithin === 'week' ? 604800000 : 2592000000
-        matchesPosted = (Date.now() - new Date(l.created_at).getTime()) <= ms
-      }
-      return matchesSearch && matchesMin && matchesMax && matchesCondition && matchesPhotos && matchesSaved && matchesLocation && matchesPosted
-    })
-    .sort((a, b) => {
-      if (sortBy === 'price_asc') return parseFloat(a.price) - parseFloat(b.price)
-      if (sortBy === 'price_desc') return parseFloat(b.price) - parseFloat(a.price)
-      if (sortBy === 'oldest') return new Date(a.created_at) - new Date(b.created_at)
-      return new Date(b.created_at) - new Date(a.created_at)
-    })
 
   const clearFilters = () => {
     setMinPrice('')
@@ -180,6 +244,16 @@ export default function Marketplace({ session }) {
         </div>
         <div style={styles.headerRight} className="mp-header-right">
           <span style={styles.email} className="mp-email">{session.user.email}</span>
+          {session.user.id === ADMIN_ID && (
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <button style={styles.adminBtn} onClick={() => setShowAdminDashboard(true)}>
+                Admin
+              </button>
+              {pendingReportCount > 0 && (
+                <span style={styles.adminBadge}>{pendingReportCount}</span>
+              )}
+            </div>
+          )}
           <button style={styles.profileBtn} onClick={() => setShowProfile(true)}>
             Profile
           </button>
@@ -350,7 +424,7 @@ export default function Marketplace({ session }) {
       {!loading && (
         <div style={styles.resultsBar}>
           <span style={styles.resultsText}>
-            {filtered.length} listing{filtered.length !== 1 ? 's' : ''} found
+            {totalCount} listing{totalCount !== 1 ? 's' : ''} found
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             {hasActiveFilters && (
@@ -376,7 +450,7 @@ export default function Marketplace({ session }) {
       <div style={styles.content} className="mp-content">
         {loading ? (
           <p style={styles.empty}>Loading listings…</p>
-        ) : filtered.length === 0 ? (
+        ) : listings.length === 0 ? (
           <div style={styles.emptyBox}>
             <p style={styles.emptyTitle}>No listings found</p>
             <p style={styles.emptyText}>Try adjusting your filters or search.</p>
@@ -385,8 +459,9 @@ export default function Marketplace({ session }) {
             )}
           </div>
         ) : (
+          <>
           <div style={styles.grid} className="mp-grid">
-            {filtered.map(listing => {
+            {listings.map(listing => {
               const isWanted = listing.listing_type === 'wanted'
               const daysLeft = listing.expires_at
                 ? Math.ceil((new Date(listing.expires_at) - new Date()) / (1000 * 60 * 60 * 24))
@@ -445,6 +520,18 @@ export default function Marketplace({ session }) {
               )
             })}
           </div>
+          {listings.length < totalCount && (
+            <div style={styles.loadMoreWrap}>
+              <button
+                style={styles.loadMoreBtn}
+                onClick={() => fetchListings(page + 1, false)}
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'Loading…' : 'Load More'}
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 
@@ -467,6 +554,7 @@ export default function Marketplace({ session }) {
             fetchUnreadCount()
           }}
           onMessagesRead={fetchUnreadCount}
+          onListingUpdated={fetchListings}
         />
       )}
 
@@ -505,6 +593,45 @@ export default function Marketplace({ session }) {
         />
       )}
 
+      {showContactAdmin && (
+        <ContactAdmin
+          session={session}
+          onClose={() => setShowContactAdmin(false)}
+        />
+      )}
+
+      {showAdminDashboard && (
+        <AdminDashboard
+          onClose={() => {
+            setShowAdminDashboard(false)
+            fetchPendingReportCount()
+          }}
+          onViewListingById={openListingById}
+        />
+      )}
+
+      {/* Footer */}
+      <div style={styles.footer}>
+        <p style={styles.footerBrand}>Westminster Marketplace</p>
+        <p style={styles.footerNote}>
+          A student marketplace for the University of Westminster community.
+          All users must be registered UoW students or staff.
+        </p>
+        <div style={styles.footerLinks}>
+          {session.user.id !== ADMIN_ID && (
+            <button style={styles.footerContactBtn} onClick={() => setShowContactAdmin(true)}>
+              Contact Admin
+            </button>
+          )}
+          <a href="mailto:w2119141@my.westminster.ac.uk" style={styles.footerEmail}>
+            w2119141@my.westminster.ac.uk
+          </a>
+        </div>
+        <p style={styles.footerCopy}>
+          © {new Date().getFullYear()} Westminster Marketplace. All rights reserved.
+        </p>
+      </div>
+
       <button style={styles.fab} onClick={() => setShowPost(true)}>+ Post Item</button>
 
     </div>
@@ -522,6 +649,8 @@ const styles = {
   email: { color: 'rgba(255,255,255,0.45)', fontSize: '0.78rem', letterSpacing: '0.02em' },
   profileBtn: { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '3px', padding: '0.3rem 0.85rem', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.05em' },
   messagesBtn: { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '3px', padding: '0.3rem 0.85rem', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.05em' },
+  adminBtn: { backgroundColor: 'rgba(220,38,38,0.15)', color: '#fca5a5', border: '1px solid rgba(220,38,38,0.4)', borderRadius: '3px', padding: '0.3rem 0.85rem', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.05em', fontWeight: 600 },
+  adminBadge: { position: 'absolute', top: '-6px', right: '-6px', backgroundColor: '#dc2626', color: 'white', borderRadius: '10px', padding: '1px 5px', fontSize: '0.65rem', fontWeight: 700, minWidth: '16px', textAlign: 'center', pointerEvents: 'none' },
   unreadBadge: { position: 'absolute', top: '-6px', right: '-6px', backgroundColor: '#c9a84c', color: '#3d0c1e', borderRadius: '10px', padding: '1px 5px', fontSize: '0.65rem', fontWeight: 700, minWidth: '16px', textAlign: 'center', pointerEvents: 'none' },
   logoutBtn: { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.45)', border: 'none', borderRadius: '3px', padding: '0.3rem 0.75rem', cursor: 'pointer', fontSize: '0.75rem', letterSpacing: '0.04em' },
   hero: { backgroundColor: 'transparent', padding: '2rem 2rem 3rem', textAlign: 'center' },
@@ -550,6 +679,8 @@ const styles = {
   emptyText: { color: '#9b7a82', fontSize: '0.875rem' },
   clearBtn2: { marginTop: '1.25rem', padding: '0.6rem 1.75rem', backgroundColor: '#3d0c1e', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '0.8rem', letterSpacing: '0.06em', textTransform: 'uppercase' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: '1.25rem' },
+  loadMoreWrap: { textAlign: 'center', marginTop: '2rem' },
+  loadMoreBtn: { padding: '0.65rem 2rem', backgroundColor: '#3d0c1e', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '0.78rem', letterSpacing: '0.06em', textTransform: 'uppercase' },
   card: { backgroundColor: 'white', borderRadius: '5px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(61,12,30,0.06), 0 4px 14px rgba(61,12,30,0.05)', cursor: 'pointer', transition: 'box-shadow 0.2s, transform 0.15s', border: '1px solid #f2e6ea' },
   cardImage: { position: 'relative', height: '185px', backgroundColor: '#faf0f3' },
   img: { width: '100%', height: '100%', objectFit: 'cover' },
@@ -580,4 +711,11 @@ const styles = {
   condFilterBtnActive: { padding: '0.3rem 0.75rem', borderRadius: '2px', border: '1px solid #c9a84c', backgroundColor: 'rgba(201,168,76,0.18)', color: '#c9a84c', cursor: 'pointer', fontSize: '0.72rem', letterSpacing: '0.05em', fontWeight: 600 },
   locationInput: { padding: '0.3rem 0.65rem', borderRadius: '2px', border: 'none', fontSize: '0.75rem', width: '160px', outline: 'none', backgroundColor: 'rgba(255,255,255,0.92)', color: '#1a0810' },
   sortSelect: { padding: '0.3rem 0.6rem', borderRadius: '3px', border: '1px solid #e8d5da', backgroundColor: 'white', fontSize: '0.72rem', color: '#4a1e2a', cursor: 'pointer', outline: 'none', letterSpacing: '0.03em' },
+  footer: { backgroundColor: 'rgba(255,255,255,0.03)', borderTop: '1px solid rgba(255,255,255,0.08)', padding: '2.5rem 2rem 2rem', textAlign: 'center', marginTop: '2rem' },
+  footerBrand: { color: '#c9a84c', fontSize: '1rem', fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', margin: '0 0 0.6rem' },
+  footerNote: { color: 'rgba(255,255,255,0.38)', fontSize: '0.75rem', lineHeight: 1.6, margin: '0 auto 1.25rem', maxWidth: '480px', letterSpacing: '0.02em' },
+  footerLinks: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' },
+  footerContactBtn: { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.65)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '3px', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.75rem', letterSpacing: '0.06em' },
+  footerEmail: { color: 'rgba(255,255,255,0.45)', fontSize: '0.75rem', textDecoration: 'none', letterSpacing: '0.02em' },
+  footerCopy: { color: 'rgba(255,255,255,0.22)', fontSize: '0.7rem', margin: 0, letterSpacing: '0.04em' },
 }

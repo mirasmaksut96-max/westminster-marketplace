@@ -26,7 +26,7 @@ const dateLabel = (dateStr) => {
   return d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
-export default function Messages({ session, onClose, onMessagesRead }) {
+export default function Messages({ session, onClose, onMessagesRead, onListingUpdated }) {
   const [conversations, setConversations] = useState([])
   const [selected, setSelected] = useState(null)
   const [messages, setMessages] = useState([])
@@ -75,19 +75,25 @@ export default function Messages({ session, onClose, onMessagesRead }) {
   useEffect(() => {
     if (!selected) return
     const otherId = selected.sender?.id === session.user.id ? selected.receiver?.id : selected.sender?.id
+    const channelConfig = {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages',
+    }
+    if (selected.listing?.id) {
+      channelConfig.filter = `listing_id=eq.${selected.listing.id}`
+    }
     const channel = supabase
-      .channel(`conv-${selected.listing?.id}-${[session.user.id, otherId].sort().join('-')}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `listing_id=eq.${selected.listing?.id}`,
-      }, payload => {
+      .channel(`conv-${selected.listing?.id ?? 'support'}-${[session.user.id, otherId].sort().join('-')}`)
+      .on('postgres_changes', channelConfig, payload => {
         const msg = payload.new
-        if (
+        const listingMatch = selected.listing?.id
+          ? msg.listing_id === selected.listing.id
+          : msg.listing_id === null
+        if (listingMatch && (
           (msg.sender_id === session.user.id && msg.receiver_id === otherId) ||
           (msg.sender_id === otherId && msg.receiver_id === session.user.id)
-        ) {
+        )) {
           fetchMessages(selected)
         }
       })
@@ -134,22 +140,34 @@ export default function Messages({ session, onClose, onMessagesRead }) {
 
   const fetchMessages = async (conv) => {
     const otherId = getOtherId(conv)
-    const { data } = await supabase
+    let query = supabase
       .from('messages')
       .select(`id, content, sent_at, sender:profiles!messages_sender_id_fkey(id, full_name)`)
-      .eq('listing_id', conv.listing?.id)
       .or(`and(sender_id.eq.${session.user.id},receiver_id.eq.${otherId}),and(sender_id.eq.${otherId},receiver_id.eq.${session.user.id})`)
       .order('sent_at', { ascending: true })
 
+    if (conv.listing?.id) {
+      query = query.eq('listing_id', conv.listing.id)
+    } else {
+      query = query.is('listing_id', null)
+    }
+
+    const { data } = await query
     if (data) setMessages(data)
   }
 
   const fetchMyRating = async (conv) => {
+    if (!conv.listing?.id) {
+      setMyRating(null)
+      setRatingScore(0)
+      setRatingComment('')
+      return
+    }
     const { data } = await supabase
       .from('ratings')
       .select('score, comment')
       .eq('rater_id', session.user.id)
-      .eq('listing_id', conv.listing?.id)
+      .eq('listing_id', conv.listing.id)
       .maybeSingle()
     setMyRating(data || null)
     setRatingScore(0)
@@ -160,7 +178,7 @@ export default function Messages({ session, onClose, onMessagesRead }) {
     if (!reply.trim() || !selected) return
     setSending(true)
     const { error } = await supabase.from('messages').insert({
-      listing_id: selected.listing?.id,
+      listing_id: selected.listing?.id ?? null,
       sender_id: session.user.id,
       receiver_id: getOtherId(selected),
       content: reply,
@@ -175,26 +193,52 @@ export default function Messages({ session, onClose, onMessagesRead }) {
 
   const handleOfferResponse = async (msg, accepted) => {
     const buyerId = msg.sender?.id
-    const content = accepted ? '✅ Accepted your offer' : '❌ Declined your offer'
-
-    await supabase.from('messages').insert({
-      listing_id: selected.listing?.id,
-      sender_id: session.user.id,
-      receiver_id: buyerId,
-      content,
-    })
+    const listingId = selected.listing?.id
 
     if (accepted) {
-      await supabase
+      const { data: updated, error: updateError } = await supabase
         .from('listings')
-        .update({ status: 'pending', locked_buyer_id: buyerId })
-        .eq('id', selected.listing?.id)
+        .update({ status: 'sold', locked_buyer_id: buyerId })
+        .eq('id', listingId)
         .eq('seller_id', session.user.id)
+        .eq('status', 'active')
+        .select()
+        .maybeSingle()
+
+      if (updateError || !updated) {
+        const { data: freshListing } = await supabase
+          .from('listings')
+          .select('status, locked_buyer_id')
+          .eq('id', listingId)
+          .single()
+        if (freshListing) {
+          setSelected(prev => ({ ...prev, listing: { ...prev.listing, ...freshListing } }))
+        }
+        alert('This listing already has a confirmed buyer, so this offer can no longer be accepted.')
+        fetchMessages(selected)
+        fetchConversations()
+        return
+      }
+
+      await supabase.from('messages').insert({
+        listing_id: listingId,
+        sender_id: session.user.id,
+        receiver_id: buyerId,
+        content: '✅ Accepted your offer',
+      })
 
       setSelected(prev => ({
         ...prev,
-        listing: { ...prev.listing, status: 'pending', locked_buyer_id: buyerId },
+        listing: { ...prev.listing, status: 'sold', locked_buyer_id: buyerId },
       }))
+      onListingUpdated?.()
+    } else {
+      await supabase.from('messages').insert({
+        listing_id: listingId,
+        sender_id: session.user.id,
+        receiver_id: buyerId,
+        content: '❌ Declined your offer',
+      })
     }
 
     fetchMessages(selected)
@@ -226,7 +270,7 @@ export default function Messages({ session, onClose, onMessagesRead }) {
   const isOfferResponse = (c) => c?.startsWith('✅ Accepted') || c?.startsWith('❌ Declined')
   const hasUnread = (conv) => !conv.is_read && conv.receiver?.id === session.user.id
 
-  const isDealLocked = selected?.listing?.status === 'pending' && !!selected?.listing?.locked_buyer_id
+  const isDealLocked = (selected?.listing?.status === 'pending' || selected?.listing?.status === 'sold') && !!selected?.listing?.locked_buyer_id
   const isLockedBuyer = isDealLocked && selected?.listing?.locked_buyer_id === session.user.id
   const isSellerOfListing = isDealLocked && selected?.listing?.seller_id === session.user.id
   const isPartyToDeal = isLockedBuyer || isSellerOfListing
@@ -303,12 +347,12 @@ export default function Messages({ session, onClose, onMessagesRead }) {
                         </span>
                         <span style={styles.convTime}>{relativeTime(conv.sent_at)}</span>
                       </div>
-                      <p style={styles.convListing}>{conv.listing?.title}</p>
+                      <p style={styles.convListing}>{conv.listing?.title ?? 'Admin support'}</p>
                       <p style={unread ? styles.convPreviewBold : styles.convPreview}>
                         {isMySent ? 'You: ' : ''}{conv.content}
                       </p>
-                      {conv.listing?.status === 'pending' && (
-                        <span style={styles.dealTag}>🤝 Deal locked</span>
+                      {(conv.listing?.status === 'pending' || conv.listing?.status === 'sold') && (
+                        <span style={styles.dealTag}>🤝 Sold</span>
                       )}
                     </div>
                     {unread && <span style={styles.unreadDot} />}
@@ -335,10 +379,12 @@ export default function Messages({ session, onClose, onMessagesRead }) {
                   <div style={styles.threadHeaderInfo}>
                     <span style={styles.threadHeaderName}>{getOtherPerson(selected)}</span>
                     <div style={styles.threadMeta}>
-                      <span style={styles.listingPill}>📦 {selected.listing?.title}</span>
+                      <span style={styles.listingPill}>
+                      {selected.listing?.title ? `📦 ${selected.listing.title}` : '🛟 Admin Support'}
+                    </span>
                       {isDealLocked && (
                         <span style={styles.dealPill}>
-                          🤝 {isLockedBuyer ? 'You are buyer' : 'Deal agreed'}
+                          ✅ {isLockedBuyer ? 'You are the buyer' : 'Sold'}
                         </span>
                       )}
                     </div>

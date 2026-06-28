@@ -29,6 +29,66 @@ const CONDITIONS = [
   { label: 'Poor', value: 'poor' },
 ]
 
+const PROHIBITED_ITEMS = [
+  {
+    category: 'Weapons',
+    keywords: ['gun', 'rifle', 'pistol', 'firearm', 'ammunition', 'ammo', 'knife', 'combat knife', 'flick knife', 'switchblade', 'sword', 'taser', 'stun gun', 'pepper spray', 'knuckle duster', 'brass knuckles', 'baton', 'crossbow', 'bb gun', 'airsoft gun', 'machete', 'butterfly knife'],
+  },
+  {
+    category: 'Controlled Drugs',
+    keywords: ['cocaine', 'heroin', 'cannabis', 'marijuana', 'weed for sale', 'mdma', 'ecstasy', 'lsd', 'acid tabs', 'ketamine', 'amphetamine', 'methamphetamine', 'meth', 'crack cocaine', 'anabolic steroids', 'dmt', 'magic mushrooms', 'psilocybin', 'psychedelics', 'spice drug', 'legal high'],
+  },
+  {
+    category: 'Tobacco & Nicotine Products',
+    keywords: ['cigarettes', 'loose tobacco', 'rolling tobacco', 'vape pen', 'vape juice', 'e-liquid', 'nicotine pouches', 'snus', 'hookah', 'shisha tobacco'],
+  },
+  {
+    category: 'Alcohol',
+    keywords: ['alcohol for sale', 'beer for sale', 'wine for sale', 'spirits for sale', 'vodka for sale', 'whisky for sale', 'rum for sale', 'gin for sale', 'selling alcohol', 'selling beer', 'selling wine'],
+  },
+  {
+    category: 'Prescription Medication',
+    keywords: ['adderall', 'ritalin', 'methylphenidate', 'oxycodone', 'xanax', 'valium', 'diazepam', 'tramadol', 'codeine for sale', 'morphine', 'fentanyl', 'prescription pills', 'prescription medication for sale'],
+  },
+  {
+    category: 'Adult / Explicit Content',
+    keywords: ['pornography', 'explicit content', 'adult content', 'nude photos', 'onlyfans account', 'xxx'],
+  },
+  {
+    category: 'Counterfeit Goods',
+    keywords: ['counterfeit', 'fake designer', 'replica designer', 'knockoff', 'knock-off brand', 'pirated', 'bootleg'],
+  },
+  {
+    category: 'Financial Fraud',
+    keywords: ['gift card codes', 'prepaid card', 'bank account details', 'credit card details', 'paypal account', 'stolen card', 'carding'],
+  },
+  {
+    category: 'Explosives & Hazardous Materials',
+    keywords: ['explosive', 'fireworks for sale', 'bomb', 'detonator', 'gunpowder', 'hazardous chemical'],
+  },
+  {
+    category: 'Account Credentials',
+    keywords: ['netflix account', 'spotify account', 'disney+ account', 'hbo account', 'account password', 'login credentials', 'cracked account'],
+  },
+]
+
+function checkProhibited(title, description) {
+  const combined = `${title} ${description}`.toLowerCase()
+  for (const rule of PROHIBITED_ITEMS) {
+    for (const kw of rule.keywords) {
+      // Escape regex special chars first, then allow flexible whitespace/hyphens
+      const escaped = kw
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/[\s\-]+/g, '[\\s\\-]+')
+      const regex = new RegExp(`(?<![a-z])${escaped}(?![a-z])`, 'i')
+      if (regex.test(combined)) {
+        return { category: rule.category, keyword: kw }
+      }
+    }
+  }
+  return null
+}
+
 
 export default function PostListing({ session, onClose, onPosted, editListing }) {
   const [listingType, setListingType] = useState(editListing?.listing_type || 'sell')
@@ -70,12 +130,11 @@ export default function PostListing({ session, onClose, onPosted, editListing })
         urls.push(urlData.publicUrl)
       }
     }
-    if (failed.length > 0) {
-      setMessage(`Warning: ${failed.length} photo(s) failed to upload. Check your Supabase storage bucket is set to public.`)
-    }
-    return urls
+    return { urls, failed }
   }
 
+
+  const violation = checkProhibited(title, description)
 
   const handleSubmit = async () => {
     if (!title || (listingType === 'sell' && !price) || !category || (listingType === 'sell' && !condition)) {
@@ -83,11 +142,24 @@ export default function PostListing({ session, onClose, onPosted, editListing })
       return
     }
 
+    if (violation) {
+      setMessage(`This listing cannot be published — prohibited item detected (${violation.category}).`)
+      return
+    }
+
     setLoading(true)
     setMessage('')
 
-    const newImageUrls = images.length > 0 ? await uploadImages() : []
-    const imageUrls = newImageUrls.length > 0 ? newImageUrls : existingImages
+    let imageUrls = existingImages
+    if (images.length > 0) {
+      const { urls, failed } = await uploadImages()
+      if (failed.length > 0) {
+        setMessage(`Could not upload ${failed.length} photo${failed.length !== 1 ? 's' : ''} (${failed.join(', ')}). Please try again before publishing.`)
+        setLoading(false)
+        return
+      }
+      imageUrls = urls
+    }
 
     const { data: categoryData } = await supabase
       .from('categories')
@@ -138,10 +210,7 @@ export default function PostListing({ session, onClose, onPosted, editListing })
       })
 
       if (error) setMessage('Error posting listing: ' + error.message)
-      else {
-        onPosted()
-        if (newImageUrls.length === images.length || images.length === 0) onClose()
-      }
+      else { onPosted(); onClose() }
     }
 
     setLoading(false)
@@ -307,13 +376,28 @@ export default function PostListing({ session, onClose, onPosted, editListing })
           )}
 
 
+          {violation && (
+            <div style={styles.prohibitedBanner}>
+              <div style={styles.prohibitedIcon}>⚠️</div>
+              <div>
+                <p style={styles.prohibitedTitle}>Item not permitted on Westminster Marketplace</p>
+                <p style={styles.prohibitedBody}>
+                  <strong>{violation.category}</strong> items cannot be listed. Please remove any references to "{violation.keyword}" from your title or description.
+                </p>
+                <p style={styles.prohibitedNote}>
+                  Prohibited items include weapons, controlled substances, tobacco/nicotine products, prescription medication, counterfeit goods, explicit content, and financial fraud items.
+                </p>
+              </div>
+            </div>
+          )}
+
           {message && <p style={styles.message}>{message}</p>}
 
 
           <button
-            style={styles.submitBtn}
+            style={{ ...styles.submitBtn, ...(violation ? styles.submitBtnDisabled : {}) }}
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || !!violation}
           >
             {loading ? (editListing ? 'Saving…' : 'Publishing…') : (editListing ? 'Save Changes' : 'Publish Listing')}
           </button>
@@ -510,5 +594,44 @@ const styles = {
     color: 'white',
     fontWeight: 500,
     letterSpacing: '0.05em',
+  },
+  prohibitedBanner: {
+    display: 'flex',
+    gap: '0.75rem',
+    alignItems: 'flex-start',
+    backgroundColor: '#fff7ed',
+    border: '1px solid #f97316',
+    borderLeft: '4px solid #f97316',
+    borderRadius: '4px',
+    padding: '0.9rem 1rem',
+    marginBottom: '1rem',
+  },
+  prohibitedIcon: {
+    fontSize: '1.1rem',
+    flexShrink: 0,
+    marginTop: '0.05rem',
+  },
+  prohibitedTitle: {
+    margin: '0 0 0.3rem',
+    fontWeight: 600,
+    fontSize: '0.85rem',
+    color: '#9a3412',
+  },
+  prohibitedBody: {
+    margin: '0 0 0.35rem',
+    fontSize: '0.82rem',
+    color: '#7c2d12',
+    lineHeight: 1.5,
+  },
+  prohibitedNote: {
+    margin: 0,
+    fontSize: '0.75rem',
+    color: '#a16207',
+    lineHeight: 1.4,
+  },
+  submitBtnDisabled: {
+    backgroundColor: '#9b8daa',
+    cursor: 'not-allowed',
+    opacity: 0.7,
   },
 }

@@ -61,50 +61,52 @@ export default function Auth() {
           >Register</button>
         </div>
 
-        {!isLogin && (
+        <form onSubmit={e => { e.preventDefault(); isLogin ? handleLogin() : handleRegister() }}>
+          {!isLogin && (
+            <input
+              style={styles.input}
+              placeholder="Full Name"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+            />
+          )}
+
           <input
             style={styles.input}
-            placeholder="Full Name"
-            value={fullName}
-            onChange={e => setFullName(e.target.value)}
+            placeholder="UoW email (@westminster.ac.uk)"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
           />
-        )}
 
-        <input
-          style={styles.input}
-          placeholder="UoW email (@westminster.ac.uk)"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
-
-        <input
-          style={styles.input}
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
-
-        {!isLogin && (
-          <select
+          <input
             style={styles.input}
-            value={role}
-            onChange={e => setRole(e.target.value)}
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+          />
+
+          {!isLogin && (
+            <select
+              style={styles.input}
+              value={role}
+              onChange={e => setRole(e.target.value)}
+            >
+              <option value="student">Student</option>
+              <option value="staff">Staff</option>
+            </select>
+          )}
+
+          {message && <p style={styles.message}>{message}</p>}
+
+          <button
+            style={styles.button}
+            type="submit"
+            disabled={loading}
           >
-            <option value="student">Student</option>
-            <option value="staff">Staff</option>
-          </select>
-        )}
-
-        {message && <p style={styles.message}>{message}</p>}
-
-        <button
-          style={styles.button}
-          onClick={isLogin ? handleLogin : handleRegister}
-          disabled={loading}
-        >
-          {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
-        </button>
+            {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
+          </button>
+        </form>
       </div>
     </div>
   )

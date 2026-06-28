@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import ReportListing from './ReportListing'
+import ContactSeller from './ContactSeller'
 
 export default function ListingDetail({ listing, session, onClose, onViewSeller, onSelectListing }) {
   const [currentImage, setCurrentImage] = useState(0)
   const [showContact, setShowContact] = useState(false)
-  const [showOffer, setShowOffer] = useState(false)
-  const [message, setMessage] = useState('')
-  const [offerPrice, setOfferPrice] = useState('')
-  const [offerNote, setOfferNote] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [contactMode, setContactMode] = useState('message')
   const [showReport, setShowReport] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [savingToggle, setSavingToggle] = useState(false)
@@ -85,47 +81,6 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
   }
 
 
-  const handleSendMessage = async () => {
-    if (!message.trim()) return
-    setSending(true)
-
-    const { error } = await supabase.from('messages').insert({
-      listing_id: listing.id,
-      sender_id: session.user.id,
-      receiver_id: listing.seller_id,
-      content: message,
-    })
-
-    if (!error) {
-      setSent(true)
-      setMessage('')
-    }
-    setSending(false)
-  }
-
-  const handleSendOffer = async () => {
-    const price = parseFloat(offerPrice)
-    if (!offerPrice || isNaN(price) || price <= 0) return
-    setSending(true)
-
-    const content = offerNote.trim()
-      ? `💰 Offer: £${price.toFixed(2)} — ${offerNote.trim()}`
-      : `💰 Offer: £${price.toFixed(2)}`
-
-    const { error } = await supabase.from('messages').insert({
-      listing_id: listing.id,
-      sender_id: session.user.id,
-      receiver_id: listing.seller_id,
-      content,
-    })
-
-    if (!error) {
-      setSent(true)
-      setOfferPrice('')
-      setOfferNote('')
-    }
-    setSending(false)
-  }
 
 
  const handleMarkAsSold = async () => {
@@ -244,6 +199,22 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
             {listing.views > 0 && (
               <span style={styles.viewsBadge}>👁 {listing.views} view{listing.views !== 1 ? 's' : ''}</span>
             )}
+            {listing.expires_at && (() => {
+              const daysLeft = Math.ceil((new Date(listing.expires_at) - new Date()) / (1000 * 60 * 60 * 24))
+              if (isOwnListing) {
+                return (
+                  <span style={daysLeft <= 7 ? styles.expiryUrgentBadge : styles.badge}>
+                    ⏱ Expires {daysLeft <= 7
+                      ? `in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
+                      : new Date(listing.expires_at).toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                  </span>
+                )
+              }
+              if (daysLeft <= 7 && daysLeft > 0) {
+                return <span style={styles.expiryUrgentBadge}>⚠ Expires in {daysLeft}d</span>
+              }
+              return null
+            })()}
           </div>
 
 
@@ -290,12 +261,12 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
 
           {/* Contact section */}
           {!isOwnListing && (() => {
-            const isDealLocked = listing.status === 'pending' && listing.locked_buyer_id
+            const isDealLocked = (listing.status === 'pending' || listing.status === 'sold') && listing.locked_buyer_id
             const isLockedBuyer = isDealLocked && listing.locked_buyer_id === session.user.id
             if (isDealLocked && !isLockedBuyer) {
               return (
                 <div style={styles.dealLockedBox}>
-                  <p style={styles.dealLockedText}>🤝 This item has a pending deal — no longer accepting offers</p>
+                  <p style={styles.dealLockedText}>🤝 This item has been sold — no longer accepting offers</p>
                 </div>
               )
             }
@@ -311,97 +282,16 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
 
           {!isOwnListing && !listing.locked_buyer_id && listing.status !== 'sold' && (
             <div style={styles.contactSection}>
-              {!showContact && !showOffer && !sent && (
-                <div style={styles.actionButtons}>
-                  <button style={styles.contactBtn} onClick={() => setShowContact(true)}>
-                    {listing.listing_type === 'wanted' ? '📦 I have this!' : '💬 Contact Seller'}
+              <div style={styles.actionButtons}>
+                <button style={styles.contactBtn} onClick={() => { setContactMode('message'); setShowContact(true) }}>
+                  {listing.listing_type === 'wanted' ? '📦 I have this!' : '💬 Contact Seller'}
+                </button>
+                {listing.listing_type !== 'wanted' && (
+                  <button style={styles.offerBtn} onClick={() => { setContactMode('offer'); setShowContact(true) }}>
+                    💰 Make an Offer
                   </button>
-                  {listing.listing_type !== 'wanted' && (
-                    <button style={styles.offerBtn} onClick={() => setShowOffer(true)}>
-                      💰 Make an Offer
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {showContact && !sent && (
-                <div style={styles.messageBox}>
-                  <h3 style={styles.sectionTitle}>
-                    {listing.listing_type === 'wanted' ? 'Tell them you have it' : 'Send a message'}
-                  </h3>
-                  <div style={styles.templateChips}>
-                    {(listing.listing_type === 'wanted'
-                      ? [
-                          `Hi, I have the ${listing.title} you're looking for!`,
-                          'Is this still available?',
-                          'Can we meet on campus?',
-                        ]
-                      : [
-                          `Hi, is the ${listing.title} still available?`,
-                          'Can we meet on campus?',
-                          'Would you take a lower price?',
-                        ]
-                    ).map(t => (
-                      <button key={t} style={styles.templateChip} onClick={() => setMessage(t)}>
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                  <textarea
-                    style={styles.textarea}
-                    placeholder={listing.listing_type === 'wanted'
-                      ? `Hi, I have the ${listing.title} you're looking for!`
-                      : `Hi, is the ${listing.title} still available?`}
-                    value={message}
-                    onChange={e => setMessage(e.target.value)}
-                    rows={3}
-                  />
-                  <div style={styles.formActions}>
-                    <button style={styles.cancelBtn} onClick={() => setShowContact(false)}>Cancel</button>
-                    <button style={styles.sendBtn} onClick={handleSendMessage} disabled={sending}>
-                      {sending ? 'Sending...' : '📨 Send Message'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {showOffer && !sent && (
-                <div style={styles.messageBox}>
-                  <h3 style={styles.sectionTitle}>Make an offer</h3>
-                  <p style={styles.askingPrice}>Asking price: £{parseFloat(listing.price).toFixed(2)}</p>
-                  <div style={styles.priceRow}>
-                    <span style={styles.poundSign}>£</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      style={styles.priceInput}
-                      placeholder="Your offer"
-                      value={offerPrice}
-                      onChange={e => setOfferPrice(e.target.value)}
-                    />
-                  </div>
-                  <textarea
-                    style={styles.textarea}
-                    placeholder="Add a note (optional)"
-                    value={offerNote}
-                    onChange={e => setOfferNote(e.target.value)}
-                    rows={2}
-                  />
-                  <div style={styles.formActions}>
-                    <button style={styles.cancelBtn} onClick={() => setShowOffer(false)}>Cancel</button>
-                    <button style={styles.sendBtn} onClick={handleSendOffer} disabled={sending || !offerPrice}>
-                      {sending ? 'Sending...' : '💰 Send Offer'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {sent && (
-                <div style={styles.sentBox}>
-                  <p style={styles.sentText}>✅ Sent! The seller will get back to you.</p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 
@@ -443,6 +333,15 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
           listing={listing}
           session={session}
           onClose={() => setShowReport(false)}
+        />
+      )}
+
+      {showContact && (
+        <ContactSeller
+          listing={listing}
+          session={session}
+          initialMode={contactMode}
+          onClose={() => setShowContact(false)}
         />
       )}
     </div>
@@ -699,106 +598,6 @@ const styles = {
     fontWeight: 'bold',
     cursor: 'pointer',
   },
-  askingPrice: {
-    margin: '0 0 0.75rem',
-    fontSize: '0.9rem',
-    color: '#6b7280',
-  },
-  priceRow: {
-    display: 'flex',
-    alignItems: 'center',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    marginBottom: '0.75rem',
-  },
-  poundSign: {
-    padding: '0.75rem',
-    backgroundColor: '#f3f4f6',
-    color: '#374151',
-    fontWeight: 'bold',
-    fontSize: '1rem',
-  },
-  priceInput: {
-    flex: 1,
-    padding: '0.75rem',
-    border: 'none',
-    fontSize: '1rem',
-    outline: 'none',
-  },
-  formActions: {
-    display: 'flex',
-    gap: '0.75rem',
-  },
-  cancelBtn: {
-    flex: 1,
-    padding: '0.75rem',
-    backgroundColor: 'white',
-    color: '#6b7280',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  messageBox: {
-    marginTop: '0.5rem',
-  },
-  templateChips: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '0.4rem',
-    marginBottom: '0.6rem',
-  },
-  templateChip: {
-    padding: '0.3rem 0.7rem',
-    borderRadius: '16px',
-    border: '1px solid #e5e7eb',
-    backgroundColor: '#f9fafb',
-    color: '#4b5563',
-    fontSize: '0.78rem',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-    textAlign: 'left',
-    maxWidth: '100%',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  textarea: {
-    width: '100%',
-    padding: '0.75rem',
-    borderRadius: '8px',
-    border: '1px solid #e5e7eb',
-    fontSize: '0.95rem',
-    boxSizing: 'border-box',
-    resize: 'vertical',
-    fontFamily: 'sans-serif',
-    marginBottom: '0.75rem',
-    outline: 'none',
-  },
-  sendBtn: {
-    flex: 1,
-    padding: '0.75rem',
-    backgroundColor: '#4a1fb8',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '1rem',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  sentBox: {
-    backgroundColor: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    borderRadius: '8px',
-    padding: '1rem',
-    textAlign: 'center',
-  },
-  sentText: {
-    color: '#166534',
-    margin: 0,
-    fontWeight: 'bold',
-  },
   ownBox: {
     backgroundColor: '#f5f3ff',
     border: '1px solid #ddd6fe',
@@ -864,6 +663,15 @@ const styles = {
   wantedBadge: {
     backgroundColor: '#dbeafe',
     color: '#1d4ed8',
+    padding: '0.3rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.85rem',
+    fontWeight: 'bold',
+  },
+  expiryUrgentBadge: {
+    backgroundColor: '#fff7ed',
+    color: '#c2410c',
+    border: '1px solid #fed7aa',
     padding: '0.3rem 0.75rem',
     borderRadius: '20px',
     fontSize: '0.85rem',
