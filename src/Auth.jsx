@@ -2,6 +2,16 @@ import { useState } from 'react'
 import { supabase } from './supabaseClient'
 
 
+function validatePassword(password) {
+  if (password.length < 8) return 'Password must be at least 8 characters long.'
+  if (!/[a-z]/.test(password)) return 'Password must include a lowercase letter.'
+  if (!/[A-Z]/.test(password)) return 'Password must include an uppercase letter.'
+  if (!/[0-9]/.test(password)) return 'Password must include a number.'
+  if (!/[^A-Za-z0-9]/.test(password)) return 'Password must include a symbol (e.g. ! @ # $ %).'
+  return null
+}
+
+
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true)
   const [fullName, setFullName] = useState('')
@@ -15,6 +25,11 @@ export default function Auth() {
   const handleRegister = async () => {
     if (!email.toLowerCase().endsWith('@westminster.ac.uk')) {
       setMessage('Only @westminster.ac.uk email addresses can register.')
+      return
+    }
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      setMessage(passwordError)
       return
     }
     setLoading(true)
@@ -85,6 +100,12 @@ export default function Auth() {
             value={password}
             onChange={e => setPassword(e.target.value)}
           />
+
+          {!isLogin && (
+            <p style={styles.hint}>
+              Min. 8 characters, with uppercase, lowercase, a number &amp; a symbol.
+            </p>
+          )}
 
           {!isLogin && (
             <select
@@ -234,5 +255,11 @@ const styles = {
     marginBottom: '1rem',
     fontSize: '0.85rem',
     lineHeight: '1.5',
+  },
+  hint: {
+    color: '#8b7d9a',
+    fontSize: '0.75rem',
+    lineHeight: '1.4',
+    margin: '-0.6rem 0 1rem',
   },
 }
