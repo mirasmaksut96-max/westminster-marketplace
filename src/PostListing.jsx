@@ -101,7 +101,7 @@ export default function PostListing({ session, onClose, onPosted, editListing })
   const [brand, setBrand] = useState(editListing?.brand || '')
   const [itemSize, setItemSize] = useState(editListing?.item_size || '')
   const [images, setImages] = useState([])
-  const [existingImages] = useState(editListing?.image_urls || [])
+  const [existingImages, setExistingImages] = useState(editListing?.image_urls || [])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -109,6 +109,18 @@ export default function PostListing({ session, onClose, onPosted, editListing })
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files).slice(0, 4)
     setImages(files)
+  }
+
+  const moveToMain = (arr, setArr, index) => {
+    if (index === 0) return
+    const next = [...arr]
+    const [item] = next.splice(index, 1)
+    next.unshift(item)
+    setArr(next)
+  }
+
+  const removePhotoAt = (arr, setArr, index) => {
+    setArr(arr.filter((_, i) => i !== index))
   }
 
 
@@ -348,10 +360,31 @@ export default function PostListing({ session, onClose, onPosted, editListing })
           {existingImages.length > 0 && images.length === 0 && (
             <div style={styles.imagePreview}>
               {existingImages.map((url, i) => (
-                <img key={i} src={url} alt="current" style={styles.previewImg} />
+                <div key={url} style={styles.photoThumbWrap}>
+                  <img src={url} alt="current" style={styles.previewImg} />
+                  {i === 0 ? (
+                    <span style={styles.mainBadge}>Main</span>
+                  ) : (
+                    <button
+                      type="button"
+                      style={styles.setMainBtn}
+                      onClick={() => moveToMain(existingImages, setExistingImages, i)}
+                    >
+                      Set as main
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={styles.removePhotoBtn}
+                    onClick={() => removePhotoAt(existingImages, setExistingImages, i)}
+                    title="Remove photo"
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
               <p style={{ fontSize: '0.72rem', color: '#9b8daa', margin: '0.4rem 0 0', width: '100%' }}>
-                Current photos — upload new ones below to replace them
+                The first photo is used as the listing's main photo. Or upload new ones below to replace the whole set.
               </p>
             </div>
           )}
@@ -365,12 +398,32 @@ export default function PostListing({ session, onClose, onPosted, editListing })
           {images.length > 0 && (
             <div style={styles.imagePreview}>
               {images.map((img, i) => (
-                <img
-                  key={i}
-                  src={URL.createObjectURL(img)}
-                  alt="preview"
-                  style={styles.previewImg}
-                />
+                <div key={`${img.name}-${img.lastModified}`} style={styles.photoThumbWrap}>
+                  <img
+                    src={URL.createObjectURL(img)}
+                    alt="preview"
+                    style={styles.previewImg}
+                  />
+                  {i === 0 ? (
+                    <span style={styles.mainBadge}>Main</span>
+                  ) : (
+                    <button
+                      type="button"
+                      style={styles.setMainBtn}
+                      onClick={() => moveToMain(images, setImages, i)}
+                    >
+                      Set as main
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={styles.removePhotoBtn}
+                    onClick={() => removePhotoAt(images, setImages, i)}
+                    title="Remove photo"
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -546,6 +599,55 @@ const styles = {
     objectFit: 'cover',
     borderRadius: '4px',
     border: '1px solid #e4dded',
+    display: 'block',
+  },
+  photoThumbWrap: {
+    position: 'relative',
+    width: '80px',
+  },
+  mainBadge: {
+    position: 'absolute',
+    top: '4px',
+    left: '4px',
+    backgroundColor: '#1a0844',
+    color: 'white',
+    fontSize: '0.6rem',
+    fontWeight: 600,
+    padding: '2px 6px',
+    borderRadius: '3px',
+    letterSpacing: '0.03em',
+  },
+  setMainBtn: {
+    position: 'absolute',
+    bottom: '3px',
+    left: '3px',
+    right: '3px',
+    padding: '2px 0',
+    backgroundColor: 'rgba(18,8,38,0.75)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '3px',
+    fontSize: '0.6rem',
+    cursor: 'pointer',
+    letterSpacing: '0.02em',
+  },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: '-6px',
+    right: '-6px',
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    backgroundColor: '#dc2626',
+    color: 'white',
+    border: '2px solid white',
+    fontSize: '0.6rem',
+    lineHeight: 1,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
   },
   message: {
     color: '#b91c1c',
