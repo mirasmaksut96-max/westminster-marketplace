@@ -32,7 +32,7 @@ React + Vite SPA backed entirely by Supabase (auth, database, storage). No routi
 - `reports` — `reporter_id, listing_id, reason, details, status`
 - `ratings` — `rated_user_id, score, comment, created_at` (used by `SellerProfile.jsx` to show reviews and average star rating)
 
-**Database functions:** `increment_listing_views(listing_id)` — called from `ListingDetail` to increment `listings.views`, skipped for the owner's own views.
+**Database functions:** `increment_listing_views(listing_id)` — called from `ListingDetail` to increment `listings.views`, skipped for the owner's own views. `mark_messages_read(p_receiver_id)` — called from `Messages.jsx` on mount to mark all of the current user's received messages as read.
 
 **Storage:** Listing images upload to the `listing-images` Supabase Storage bucket. Public URLs are stored in `listings.image_urls[]`.
 

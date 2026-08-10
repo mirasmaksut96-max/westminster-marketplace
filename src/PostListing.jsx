@@ -79,7 +79,7 @@ function checkProhibited(title, description) {
       // Escape regex special chars first, then allow flexible whitespace/hyphens
       const escaped = kw
         .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        .replace(/[\s\-]+/g, '[\\s\\-]+')
+        .replace(/[\s-]+/g, '[\\s\\-]+')
       const regex = new RegExp(`(?<![a-z])${escaped}(?![a-z])`, 'i')
       if (regex.test(combined)) {
         return { category: rule.category, keyword: kw }
@@ -101,7 +101,7 @@ export default function PostListing({ session, onClose, onPosted, editListing })
   const [brand, setBrand] = useState(editListing?.brand || '')
   const [itemSize, setItemSize] = useState(editListing?.item_size || '')
   const [images, setImages] = useState([])
-  const [existingImages, setExistingImages] = useState(editListing?.image_urls || [])
+  const [existingImages] = useState(editListing?.image_urls || [])
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 

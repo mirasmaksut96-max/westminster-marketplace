@@ -8,11 +8,7 @@ export default function AdminDashboard({ onClose, onViewListingById }) {
   const [working, setWorking] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
 
-  useEffect(() => {
-    fetchReports()
-  }, [])
-
-  const fetchReports = async () => {
+  async function fetchReports() {
     setLoading(true)
     const { data } = await supabase
       .from('reports')
@@ -25,6 +21,12 @@ export default function AdminDashboard({ onClose, onViewListingById }) {
     if (data) setReports(data)
     setLoading(false)
   }
+
+  useEffect(() => {
+    // React Compiler is not enabled in this project; mount-time data fetching is safe here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchReports()
+  }, [])
 
   const resolveReport = async (report) => {
     const key = report.id ?? report.listing_id

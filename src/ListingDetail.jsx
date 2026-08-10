@@ -27,23 +27,7 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
     }
   }
 
-  useEffect(() => {
-    supabase
-      .from('saved_items')
-      .select('listing_id')
-      .eq('user_id', session.user.id)
-      .eq('listing_id', listing.id)
-      .maybeSingle()
-      .then(({ data }) => setIsSaved(!!data))
-    fetchSellerRating()
-    fetchRelatedListings()
-    // increment view counter (don't count owner's own views)
-    if (session.user.id !== listing.seller_id) {
-      supabase.rpc('increment_listing_views', { listing_id: listing.id })
-    }
-  }, [listing.id, session.user.id])
-
-  const fetchRelatedListings = async () => {
+  async function fetchRelatedListings() {
     if (!listing.category_id) return
     const { data } = await supabase
       .from('listings')
@@ -55,7 +39,7 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
     if (data) setRelatedListings(data)
   }
 
-  const fetchSellerRating = async () => {
+  async function fetchSellerRating() {
     const { data } = await supabase
       .from('ratings')
       .select('score')
@@ -65,6 +49,24 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
       setSellerRating({ avg: avg.toFixed(1), count: data.length })
     }
   }
+
+  useEffect(() => {
+    supabase
+      .from('saved_items')
+      .select('listing_id')
+      .eq('user_id', session.user.id)
+      .eq('listing_id', listing.id)
+      .maybeSingle()
+      .then(({ data }) => setIsSaved(!!data))
+    // React Compiler is not enabled in this project; mount-time data fetching is safe here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSellerRating()
+    fetchRelatedListings()
+    // increment view counter (don't count owner's own views)
+    if (session.user.id !== listing.seller_id) {
+      supabase.rpc('increment_listing_views', { listing_id: listing.id })
+    }
+  }, [listing.id, session.user.id])
 
   const handleToggleSave = async () => {
     setSavingToggle(true)
@@ -202,6 +204,9 @@ export default function ListingDetail({ listing, session, onClose, onViewSeller,
             {listing.expires_at && (() => {
               const daysLeft = Math.ceil((new Date(listing.expires_at) - new Date()) / (1000 * 60 * 60 * 24))
               if (isOwnListing) {
+                if (daysLeft <= 0) {
+                  return <span style={styles.expiryUrgentBadge}>⏱ Expired</span>
+                }
                 return (
                   <span style={daysLeft <= 7 ? styles.expiryUrgentBadge : styles.badge}>
                     ⏱ Expires {daysLeft <= 7

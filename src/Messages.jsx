@@ -48,7 +48,7 @@ export default function Messages({ session, onClose, onMessagesRead, onListingUp
     fetchConversations()
   }, [])
 
-  const markAllRead = async () => {
+  async function markAllRead() {
     await supabase.rpc('mark_messages_read', { p_receiver_id: session.user.id })
     if (onMessagesRead) onMessagesRead()
   }
@@ -112,7 +112,7 @@ export default function Messages({ session, onClose, onMessagesRead, onListingUp
   const getOtherPerson = (conv) =>
     conv.sender?.id === session.user.id ? conv.receiver?.full_name : conv.sender?.full_name
 
-  const fetchConversations = async () => {
+  async function fetchConversations() {
     setLoading(true)
     const { data, error } = await supabase
       .from('messages')
@@ -138,7 +138,7 @@ export default function Messages({ session, onClose, onMessagesRead, onListingUp
     setLoading(false)
   }
 
-  const fetchMessages = async (conv) => {
+  async function fetchMessages(conv) {
     const otherId = getOtherId(conv)
     let query = supabase
       .from('messages')
@@ -156,7 +156,7 @@ export default function Messages({ session, onClose, onMessagesRead, onListingUp
     if (data) setMessages(data)
   }
 
-  const fetchMyRating = async (conv) => {
+  async function fetchMyRating(conv) {
     if (!conv.listing?.id) {
       setMyRating(null)
       setRatingScore(0)
@@ -187,6 +187,8 @@ export default function Messages({ session, onClose, onMessagesRead, onListingUp
       setReply('')
       fetchMessages(selected)
       fetchConversations()
+    } else {
+      alert('Could not send message: ' + error.message)
     }
     setSending(false)
   }

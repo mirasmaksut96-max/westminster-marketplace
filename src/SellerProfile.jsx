@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 
-export default function SellerProfile({ sellerId, sellerName, sellerRole, session, onClose, onSelectListing }) {
+export default function SellerProfile({ sellerId, sellerName, sellerRole, onClose, onSelectListing }) {
   const [ratings, setRatings] = useState([])
   const [listings, setListings] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchData()
-  }, [sellerId])
-
-  const fetchData = async () => {
+  async function fetchData() {
     setLoading(true)
     const [ratingsRes, listingsRes] = await Promise.all([
       supabase
@@ -29,6 +25,12 @@ export default function SellerProfile({ sellerId, sellerName, sellerRole, sessio
     if (!listingsRes.error) setListings(listingsRes.data || [])
     setLoading(false)
   }
+
+  useEffect(() => {
+    // React Compiler is not enabled in this project; mount-time data fetching is safe here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData()
+  }, [sellerId])
 
   const avgRating = ratings.length > 0
     ? (ratings.reduce((s, r) => s + r.score, 0) / ratings.length).toFixed(1)

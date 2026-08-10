@@ -7,6 +7,7 @@ import Profile from './Profile'
 import SellerProfile from './SellerProfile'
 import ContactAdmin, { ADMIN_ID } from './ContactAdmin'
 import AdminDashboard from './AdminDashboard'
+import Guidelines from './Guidelines'
 
 const CATEGORIES = [
   { label: 'All', value: 'all' },
@@ -48,6 +49,7 @@ export default function Marketplace({ session }) {
   const [viewMode, setViewMode] = useState('active')
   const [selectedSeller, setSelectedSeller] = useState(null)
   const [showContactAdmin, setShowContactAdmin] = useState(false)
+  const [showGuidelines, setShowGuidelines] = useState(false)
   const [showAdminDashboard, setShowAdminDashboard] = useState(false)
   const [pendingReportCount, setPendingReportCount] = useState(0)
   const [sortBy, setSortBy] = useState('newest')
@@ -85,7 +87,7 @@ export default function Marketplace({ session }) {
     return () => clearInterval(interval)
   }, [])
 
-  const fetchListings = async (pageNum = 0, replace = true, savedItemsOverride = null) => {
+  async function fetchListings(pageNum = 0, replace = true, savedItemsOverride = null) {
     if (replace) setLoading(true)
     else setLoadingMore(true)
     const reqId = ++requestIdRef.current
@@ -156,7 +158,7 @@ export default function Marketplace({ session }) {
     setLoadingMore(false)
   }
 
-  const fetchUnreadCount = async () => {
+  async function fetchUnreadCount() {
     const { count } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
@@ -165,7 +167,7 @@ export default function Marketplace({ session }) {
     setUnreadCount(count || 0)
   }
 
-  const fetchPendingReportCount = async () => {
+  async function fetchPendingReportCount() {
     const { count } = await supabase
       .from('reports')
       .select('*', { count: 'exact', head: true })
@@ -182,7 +184,7 @@ export default function Marketplace({ session }) {
     if (data) setSelectedListing(data)
   }
 
-  const fetchSavedItems = async () => {
+  async function fetchSavedItems() {
     const { data, error } = await supabase
       .from('saved_items')
       .select('listing_id')
@@ -600,6 +602,10 @@ export default function Marketplace({ session }) {
         />
       )}
 
+      {showGuidelines && (
+        <Guidelines onClose={() => setShowGuidelines(false)} />
+      )}
+
       {showAdminDashboard && (
         <AdminDashboard
           onClose={() => {
@@ -618,6 +624,9 @@ export default function Marketplace({ session }) {
           All users must be registered UoW students or staff.
         </p>
         <div style={styles.footerLinks}>
+          <button style={styles.footerContactBtn} onClick={() => setShowGuidelines(true)}>
+            Community Guidelines
+          </button>
           {session.user.id !== ADMIN_ID && (
             <button style={styles.footerContactBtn} onClick={() => setShowContactAdmin(true)}>
               Contact Admin

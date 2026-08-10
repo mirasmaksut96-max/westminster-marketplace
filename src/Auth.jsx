@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
+import Guidelines from './Guidelines'
 
 
 function validatePassword(password) {
@@ -20,6 +21,7 @@ export default function Auth() {
   const [role, setRole] = useState('student')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [showGuidelines, setShowGuidelines] = useState(false)
 
 
   const handleRegister = async () => {
@@ -128,7 +130,15 @@ export default function Auth() {
             {loading ? 'Please wait…' : isLogin ? 'Sign In' : 'Create Account'}
           </button>
         </form>
+
+        <button style={styles.guidelinesLink} onClick={() => setShowGuidelines(true)} type="button">
+          Community Guidelines
+        </button>
       </div>
+
+      {showGuidelines && (
+        <Guidelines onClose={() => setShowGuidelines(false)} />
+      )}
     </div>
   )
 }
@@ -255,6 +265,19 @@ const styles = {
     marginBottom: '1rem',
     fontSize: '0.85rem',
     lineHeight: '1.5',
+  },
+  guidelinesLink: {
+    display: 'block',
+    width: '100%',
+    marginTop: '1.5rem',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'center',
+    color: '#8b7d9a',
+    fontSize: '0.72rem',
+    letterSpacing: '0.05em',
+    textDecoration: 'underline',
   },
   hint: {
     color: '#8b7d9a',

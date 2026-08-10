@@ -31,7 +31,7 @@ export default function Profile({ session, onClose }) {
     fetchMyListings()
   }, [])
 
-  const fetchProfile = async () => {
+  async function fetchProfile() {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -124,7 +124,7 @@ export default function Profile({ session, onClose }) {
     else alert('Could not save position: ' + error.message)
   }
 
-  const fetchMyListings = async () => {
+  async function fetchMyListings() {
     const { data, error } = await supabase
       .from('listings')
       .select('*, categories(name, slug)')
