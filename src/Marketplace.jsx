@@ -61,6 +61,7 @@ export default function Marketplace({ session }) {
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [itemsReused, setItemsReused] = useState(null)
   const requestIdRef = useRef(0)
 
   const debouncedSearch = useDebouncedValue(search, 350)
@@ -70,6 +71,10 @@ export default function Marketplace({ session }) {
 
   useEffect(() => {
     fetchSavedItems()
+  }, [])
+
+  useEffect(() => {
+    fetchImpactStats()
   }, [])
 
   useEffect(() => {
@@ -165,6 +170,17 @@ export default function Marketplace({ session }) {
       .eq('receiver_id', session.user.id)
       .eq('is_read', false)
     setUnreadCount(count || 0)
+  }
+
+  async function fetchImpactStats() {
+    // Count sold "sell" listings as items that were reused instead of bought new.
+    // Wanted ads and removed/expired listings don't represent a completed reuse, so they're excluded.
+    const { count } = await supabase
+      .from('listings')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'sold')
+      .or('listing_type.eq.sell,listing_type.is.null')
+    setItemsReused(count ?? 0)
   }
 
   async function fetchPendingReportCount() {
@@ -276,6 +292,10 @@ export default function Marketplace({ session }) {
       {/* Hero */}
       <div style={styles.hero} className="mp-hero">
         <h2 style={styles.heroText}>Buy &amp; sell within the University of Westminster community</h2>
+        <p style={styles.impactLine}>
+          🌱 {itemsReused === null ? '…' : itemsReused} item{itemsReused === 1 ? '' : 's'} given a second
+          life by this community — every one is a purchase that didn't need to be made new.
+        </p>
         <div style={styles.searchRow}>
           <input
             style={styles.search}
@@ -620,8 +640,9 @@ export default function Marketplace({ session }) {
       <div style={styles.footer}>
         <p style={styles.footerBrand}>Westminster Marketplace</p>
         <p style={styles.footerNote}>
-          A student marketplace for the University of Westminster community.
-          All users must be registered UoW students or staff.
+          A student marketplace for the University of Westminster community. Buying and selling
+          secondhand keeps good items in use and out of landfill. All users must be registered
+          UoW students or staff.
         </p>
         <div style={styles.footerLinks}>
           <button style={styles.footerContactBtn} onClick={() => setShowGuidelines(true)}>
@@ -664,6 +685,7 @@ const styles = {
   logoutBtn: { backgroundColor: 'transparent', color: 'rgba(255,255,255,0.45)', border: 'none', borderRadius: '3px', padding: '0.3rem 0.75rem', cursor: 'pointer', fontSize: '0.75rem', letterSpacing: '0.04em' },
   hero: { backgroundColor: 'transparent', padding: '2rem 2rem 3rem', textAlign: 'center' },
   heroText: { color: 'rgba(255,255,255,0.88)', margin: '0 0 1.5rem', fontSize: '1.6rem', fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 400, letterSpacing: '0.02em' },
+  impactLine: { color: '#a8d5ba', fontSize: '0.8rem', margin: '-0.75rem 0 1.5rem', letterSpacing: '0.02em', maxWidth: '520px', marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 },
   searchRow: { display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' },
   search: { flex: 1, maxWidth: '480px', padding: '0.8rem 1.25rem', borderRadius: '3px', border: 'none', fontSize: '0.9rem', boxSizing: 'border-box', outline: 'none', backgroundColor: 'rgba(255,255,255,0.96)', color: '#1a0810' },
   filterBtn: { padding: '0.8rem 1.25rem', borderRadius: '3px', border: '1px solid rgba(201,168,76,0.4)', backgroundColor: 'rgba(201,168,76,0.08)', color: '#c9a84c', cursor: 'pointer', fontSize: '0.78rem', whiteSpace: 'nowrap', letterSpacing: '0.08em', textTransform: 'uppercase' },

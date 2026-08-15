@@ -55,6 +55,18 @@ export default function Guidelines({ onClose }) {
             </div>
           </Section>
 
+          <Section title="Buying secondhand, sustainably">
+            <p style={styles.text}>
+              Every listing here is one less item manufactured from scratch, and one more kept out
+              of landfill. A few ways to make the biggest difference:
+            </p>
+            <ul style={styles.list}>
+              <li>Before binning something at the end of term, list it here — someone probably needs exactly what you don't.</li>
+              <li>If an item is genuinely unsellable, consider listing it for free rather than throwing it out — someone may still want it as-is or for parts.</li>
+              <li>Meet up on campus instead of arranging a courier: it's safer, and it skips the extra packaging and emissions.</li>
+            </ul>
+          </Section>
+
           <Section title="Posting a listing">
             <ul style={styles.list}>
               <li>Only list items you personally own and are entitled to sell or give away.</li>
